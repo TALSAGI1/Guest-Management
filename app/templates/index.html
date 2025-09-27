@@ -1,0 +1,7 @@
+<!doctype html><html><body>
+<h1>Guest Management</h1>
+<p><a href="/guests/new">+ New Guest</a></p>
+<table border="1"><tr><th>Name</th><th>Email</th></tr>
+{% for g in guests %}<tr><td>{{g.name}}</td><td>{{g.email}}</td></tr>{% endfor %}
+</table>
+</body></html>
