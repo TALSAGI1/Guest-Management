@@ -1,0 +1,40 @@
+name: CD - Build & Push Image to GHCR
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image name + tags (lowercase)
+        id: meta
+        run: |
+          # repo בפורמט owner/repo אבל באותיות קטנות בלבד
+          REPO_LC="${{ toLower(github.repository) }}"
+          echo "image=ghcr.io/${REPO_LC}" >> $GITHUB_OUTPUT
+          echo "tag_sha=${GITHUB_SHA::12}" >> $GITHUB_OUTPUT
+
+      - name: Build & Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag_sha }}
+            ${{ steps.meta.outputs.image }}:latest
