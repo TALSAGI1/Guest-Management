@@ -1,0 +1,37 @@
+# סביבת פייתון מקומית וארטיפקטים
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.log
+*.coverage
+
+# קבצי קונפיג/סודות מקומיים
+.env
+.env.*
+*.secret
+*.pem
+*.key
+
+# Git ומטא־דאטה
+.git
+.gitignore
+.gitattributes
+
+# ארטיפקטים של הפרויקט (לרוב לא צריך בתוך האימג’)
+migrations/
+instance/
+guest.db
+
+# קבצים גדולים/בנויים
+dist/
+build/
+node_modules/
+
+# זבל מערכת/IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
