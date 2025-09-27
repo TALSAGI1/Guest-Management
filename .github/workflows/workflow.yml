@@ -2,13 +2,12 @@ name: CI + CD (Build & Push to GHCR)
 
 on:
   push:
-    branches: ["**"]          # בכל פוש נריץ בדיקות; נדחוף אימג' רק אם זה main
-  pull_request:               # ב-PR נריץ רק בדיקות (ולא נדחוף)
+    branches: ["**"]        # בדיקות על כל ענף; push ל-GHCR רק על main
+  pull_request:
   workflow_dispatch:
 
 jobs:
   test:
-    name: Run pytest
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,30 +22,32 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
-      - name: Pytest
+      - name: Run pytest
         run: pytest -q
 
   build_and_push:
-    name: Build Docker image (push only on main)
     needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write          # מאפשר דחיפה ל-GHCR עם GITHUB_TOKEN
+      packages: write     # דחיפה ל-GHCR עם GITHUB_TOKEN
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare image name + tags (lowercase)
+      # מחושב בלינוקס (Bash): repo באותיות קטנות + האם זה main
+      - name: Prepare image name + tags
         id: meta
         run: |
-          REPO_LC="${{ toLower(github.repository) }}"        # owner/repo באותיות קטנות (דרישת GHCR)
-          echo "image=ghcr.io/${REPO_LC}" >> $GITHUB_OUTPUT
-          echo "tag_sha=${GITHUB_SHA::12}" >> $GITHUB_OUTPUT
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "do_push=true"  >> $GITHUB_OUTPUT
+          # github.repository הוא Owner/Repo - נוריד לאותיות קטנות דרך tr
+          REPO_LC="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          echo "image=ghcr.io/${REPO_LC}" >> "$GITHUB_OUTPUT"
+          echo "tag_sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            echo "do_push=true"  >> "$GITHUB_OUTPUT"
           else
-            echo "do_push=false" >> $GITHUB_OUTPUT
+            echo "do_push=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up Docker Buildx
@@ -64,7 +65,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: ${{ steps.meta.outputs.do_push }}            # true רק על main
+          push: ${{ steps.meta.outputs.do_push }}   # true רק על main
           tags: |
             ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag_sha }}
             ${{ steps.meta.outputs.image }}:latest
