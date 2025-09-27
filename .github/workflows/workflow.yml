@@ -1,40 +1,71 @@
-name: CD - Build & Push Image to GHCR
+name: CI + CD (Build & Push to GHCR)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["**"]        # בדיקות על כל ענף; push ל-GHCR רק על main
+  pull_request:
   workflow_dispatch:
 
 jobs:
-  build-and-push:
+  test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Log in to GHCR
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        run: pytest -q
+
+  build_and_push:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write     # דחיפה ל-GHCR עם GITHUB_TOKEN
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # מחושב בלינוקס (Bash): repo באותיות קטנות + האם זה main
+      - name: Prepare image name + tags
+        id: meta
+        run: |
+          # github.repository הוא Owner/Repo - נוריד לאותיות קטנות דרך tr
+          REPO_LC="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          echo "image=ghcr.io/${REPO_LC}" >> "$GITHUB_OUTPUT"
+          echo "tag_sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            echo "do_push=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "do_push=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR (only on main)
+        if: steps.meta.outputs.do_push == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set image name + tags (lowercase)
-        id: meta
-        run: |
-          # repo בפורמט owner/repo אבל באותיות קטנות בלבד
-          REPO_LC="${{ toLower(github.repository) }}"
-          echo "image=ghcr.io/${REPO_LC}" >> $GITHUB_OUTPUT
-          echo "tag_sha=${GITHUB_SHA::12}" >> $GITHUB_OUTPUT
-
-      - name: Build & Push
+      - name: Build (and push if main)
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          push: ${{ steps.meta.outputs.do_push }}   # true רק על main
           tags: |
             ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag_sha }}
             ${{ steps.meta.outputs.image }}:latest
