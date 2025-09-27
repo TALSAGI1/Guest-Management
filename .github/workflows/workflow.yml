@@ -1,0 +1,39 @@
+name: CD - Build & Push Docker image to GHCR
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write   # נדרש כדי לדחוף ל-GHCR עם GITHUB_TOKEN
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image name and tags
+        id: meta
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}/app"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          echo "tag_sha=${GITHUB_SHA::12}" >> $GITHUB_OUTPUT
+
+      - name: Build & Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag_sha }}
+            ${{ steps.meta.outputs.image }}:latest
