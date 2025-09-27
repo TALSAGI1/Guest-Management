@@ -1,5 +1,5 @@
-Guest Management (Flask)
-
+**Guest Management (Flask)
+**
 A simple, educational Guest Management app: create, view, edit, and delete guests via a web UI. The project includes automated tests, containerization, and CI/CD.
 
 Features
